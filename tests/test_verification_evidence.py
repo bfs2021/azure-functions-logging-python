@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from importlib.machinery import ModuleSpec
 import json
 from pathlib import Path
 import sys
@@ -166,12 +167,34 @@ def test_missing_tools_fail_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPat
 
 
 def test_host_prerequisites_do_not_require_mermaid(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given all required Python modules and host tools, but no Mermaid executable.
+    monkeypatch.setattr(
+        "tools.verification_environment.importlib.util.find_spec",
+        lambda module: ModuleSpec(module, loader=None),
+    )
     monkeypatch.setattr(
         "tools.verification_environment.shutil.which",
         lambda tool: None if tool == "mmdc" else "/tools/" + tool,
     )
     assert doctor(quality=False) == 0
     assert doctor() != 0
+
+
+@pytest.mark.parametrize("missing", ["venv", "ruff", "mypy", "pytest", "bandit", "build", "mkdocs"])
+def test_host_prerequisites_fail_when_required_module_is_missing(
+    monkeypatch: pytest.MonkeyPatch, missing: str
+) -> None:
+    # Given exactly one missing module, with every executable available.
+    monkeypatch.setattr(
+        "tools.verification_environment.importlib.util.find_spec",
+        lambda module: None if module == missing else ModuleSpec(module, loader=None),
+    )
+    monkeypatch.setattr(
+        "tools.verification_environment.shutil.which", lambda tool: "/tools/" + tool
+    )
+
+    # When checking host prerequisites, then the missing module must fail closed.
+    assert doctor(quality=False) == 1
 
 
 def test_offline_selection_keeps_all_privacy_tests() -> None:

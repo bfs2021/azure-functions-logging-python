@@ -302,7 +302,8 @@ jobs:
       - name: Enforce runtime dependency policy
         run: |
           site_packages=$("$RUNNER_TEMP/candidate/bin/python" -c 'import sysconfig; print(sysconfig.get_path("purelib"))')
-          python -m tools.dependency_audit_policy --site-packages "$site_packages" --output security-results/${{ matrix.closure }}
+          wheels=(candidate-dist/*.whl)
+          make security-runtime AUDIT_ARGS="--site-packages $site_packages --candidate-wheel ${wheels[0]} --output security-results/${{ matrix.closure }}"
       - name: Upload redacted release security evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

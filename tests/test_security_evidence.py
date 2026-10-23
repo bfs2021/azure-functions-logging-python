@@ -132,7 +132,11 @@ def test_static_policy_matches_exact_location_and_expires() -> None:
 
 @pytest.mark.parametrize(
     "outcome,status",
-    [("success", Status.PASS), ("failure", Status.TOOL_ERROR), ("skipped", Status.INCOMPLETE)],
+    [
+        ("success", Status.INCOMPLETE),
+        ("failure", Status.TOOL_ERROR),
+        ("skipped", Status.INCOMPLETE),
+    ],
 )
 def test_semgrep_outcome_is_not_a_vulnerability(outcome: str, status: Status) -> None:
     # Given action outcome only; When recorded; Then finding counts stay unknown.

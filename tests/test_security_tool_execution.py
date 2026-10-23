@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+from zipfile import ZipFile
 
 import pytest
 
@@ -75,7 +76,7 @@ def test_execution_errors_never_pass(
 
     monkeypatch.setattr(subprocess, "run", fail)
     assert security_evidence.run_bandit().status == Status.TOOL_ERROR
-    assert dependency_audit_policy.run_audit(tmp_path, tmp_path).status == Status.TOOL_ERROR
+    assert dependency_audit_policy.run_audit(tmp_path, tmp_path).status == Status.INCOMPLETE
 
 
 def test_audit_uses_only_candidate_installation(
@@ -83,11 +84,17 @@ def test_audit_uses_only_candidate_installation(
 ) -> None:
     # Given an isolated inventory; When audited; Then tooling cannot contaminate its closure.
     (tmp_path / "example.dist-info").mkdir()
+    (tmp_path / "example.dist-info/METADATA").write_text("Name: example\nVersion: 1\n")
+    (tmp_path / "candidate.dist-info").mkdir()
+    (tmp_path / "candidate.dist-info/METADATA").write_text("Name: candidate\nVersion: 99\n")
+    wheel = tmp_path / "candidate.whl"
+    with ZipFile(wheel, "w") as archive:
+        archive.writestr("candidate.dist-info/METADATA", "Name: candidate\nVersion: 99\n")
     policy = tmp_path / "policy.json"
     policy.write_text('{"schema_version":1,"blocking":"all-known-runtime","exceptions":[]}')
 
     def complete(command: list[str], **kwargs: str) -> subprocess.CompletedProcess[str]:
-        assert command[command.index("--path") + 1] == str(tmp_path)
+        assert Path(command[command.index("--requirement") + 1]).read_text() == "example==1\n"
         return subprocess.CompletedProcess(
             command,
             0,
@@ -97,7 +104,7 @@ def test_audit_uses_only_candidate_installation(
 
     monkeypatch.setattr(subprocess, "run", complete)
     monkeypatch.setattr(dependency_audit_policy, "version", lambda name: "2.10.1")
-    assert dependency_audit_policy.run_audit(tmp_path, policy).status == Status.PASS
+    assert dependency_audit_policy.run_audit(tmp_path, policy, wheel).status == Status.PASS
 
 
 @pytest.mark.parametrize("development", [False, True])
@@ -108,12 +115,22 @@ def test_audit_cli_preserves_failure_codes(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, development: bool, status: Status, code: int
 ) -> None:
     # Given a classified failure; When CLI writes evidence; Then the same failure reaches CI.
-    args = ["audit", "--site-packages", str(tmp_path), "--output", str(tmp_path)]
+    args = [
+        "audit",
+        "--site-packages",
+        str(tmp_path),
+        "--output",
+        str(tmp_path),
+        "--candidate-wheel",
+        "candidate.whl",
+    ]
     if development:
         args.append("--development")
     monkeypatch.setattr(sys, "argv", args)
     monkeypatch.setattr(
-        dependency_audit_policy, "run_audit", lambda path, policy: Check("pip-audit", (), status, 1)
+        dependency_audit_policy,
+        "run_audit",
+        lambda path, policy, wheel: Check("pip-audit", (), status, 1),
     )
     assert dependency_audit_policy.main() == code
     assert json.loads((tmp_path / "summary.json").read_text())["checks"][0]["status"] == status

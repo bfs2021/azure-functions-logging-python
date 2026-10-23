@@ -10,11 +10,15 @@ import sys
 
 def doctor(live: bool = True, quality: bool = True) -> int:
     healthy = (3, 11) <= sys.version_info[:2] < (3, 15)
+    modules_available = True
     print(f"python REQUIRED >=3.11,<3.15: {sys.version.split()[0]} ({sys.executable})")
     for module in ("venv", "ruff", "mypy", "pytest", "bandit", "build", "mkdocs"):
         found = importlib.util.find_spec(module) is not None
         print(f"{module} REQUIRED: {'found' if found else 'MISSING'}")
         healthy = healthy and found
+        modules_available = modules_available and found
+    if not modules_available:
+        print("development environment not created: run make install")
     for tool in ("func", "azurite"):
         path = shutil.which(tool)
         print(f"{tool} REQUIRED for integration/verify: {path or 'MISSING'}")

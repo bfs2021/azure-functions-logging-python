@@ -42,7 +42,7 @@ def test_routine_commands_do_not_bootstrap(target: str) -> None:
 
 def test_check_is_complete_non_mutating_and_types_once() -> None:
     # Given the complete quality gate, when expanding its dependencies.
-    result = subprocess.run(["make", "-n", "check"], cwd=ROOT, capture_output=True, text=True)
+    result = subprocess.run(["make", "-n", "check-steps"], cwd=ROOT, capture_output=True, text=True)
     # Then every repository policy checker runs without mutation.
     assert result.returncode == 0
     assert result.stdout.count("-m mypy") == 1
@@ -57,6 +57,13 @@ def test_check_is_complete_non_mutating_and_types_once() -> None:
     assert "scripts/render_mermaid.py" in result.stdout
     assert "--check" in result.stdout
     assert "--fix" not in result.stdout
+
+
+def test_maintenance_uses_no_hatch_environment(tmp_path: Path) -> None:
+    environment = dict(os.environ, HATCH_DATA_DIR=str(tmp_path / "hatch"), CI="")
+    for target in ("doctor", "report"):
+        subprocess.run(["make", target], cwd=ROOT, env=environment, capture_output=True, text=True)
+    assert not list((tmp_path / "hatch").rglob("pyvenv.cfg"))
 
 
 def test_unconfigured_azure_cli_fails_with_saved_incomplete(tmp_path: Path) -> None:

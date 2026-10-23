@@ -7,6 +7,7 @@ else
 RUN := $(PYTHON)
 endif
 TREES := src tests tools examples benchmarks scripts
+MAINTENANCE_PYTHON = $(shell sh tools/maintenance_python.sh)
 
 .PHONY: bootstrap ensure-hatch install install-ci
 bootstrap ensure-hatch:
@@ -49,12 +50,17 @@ lint-doc-links:
 	@$(RUN) tools/lint_doc_links.py
 lint-mermaid:
 	@$(RUN) scripts/render_mermaid.py
-check: style typecheck security lint-workflows lint-doc-links lint-mermaid
+check:
+	@$(RUN) -m tools.verification focused check -m tools.verification_check
+.PHONY: check-steps
+check-steps: style typecheck security lint-workflows lint-doc-links lint-mermaid
 check-all: verify
 
 .PHONY: test integration otel host-smoke host-matrix verify report wheel-smoke
-test integration otel host-smoke host-matrix verify report:
+test integration otel host-smoke host-matrix verify:
 	@$(RUN) -m tools.verification $@
+report:
+	@$(MAINTENANCE_PYTHON) -m tools.verification report
 wheel-smoke:
 	@$(RUN) -m tools.verification focused wheel-smoke -m tools.verification_wheel
 
@@ -86,9 +92,9 @@ version: ensure-hatch
 
 .PHONY: doctor clean clean-all help
 doctor:
-	@$(RUN) -m tools.verification doctor
+	@$(MAINTENANCE_PYTHON) -m tools.verification doctor
 clean:
-	@$(RUN) -m tools.verification clean
+	@$(MAINTENANCE_PYTHON) -m tools.verification clean
 clean-all: clean
 	@find . -type d -name "__pycache__" -not -path "./.git/*" -exec rm -rf {} +
 	@find . -type f \( -name "*.pyc" -o -name "*.pyo" \) -not -path "./.git/*" -delete

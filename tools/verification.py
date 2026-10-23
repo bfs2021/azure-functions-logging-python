@@ -155,7 +155,7 @@ def verify() -> int:
         path = Path("test-results") / target / "summary.json"
         path.unlink(missing_ok=True)
         code = run(["make", target], directory / "logs" / f"{target}.log", 1200)
-        if target != "check" and path.exists():
+        if path.exists():
             summary = Summary(**json.loads(path.read_text()))
             if code and summary.status == "PASS":
                 summary = replace(summary, status="FAIL", exit_code=code)

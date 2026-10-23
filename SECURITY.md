@@ -55,7 +55,7 @@ exception. Publishing still uploads the exact `build` artifact, without rebuildi
 
 ## Static scope and reviewed suppressions
 
-`hatch run python -m tools.security_evidence bandit` scans every Python file under
+`make security` (also `make security-inventory` / `make security-bandit`) scans every Python file under
 `src/`, `examples/` (including `e2e_app` and `otel_app`), `scripts/`, `tools/`, and
 `benchmarks/`. Benchmarks are included even when not executed by a particular CI
 lane. There are no per-file exclusions within these surfaces. Tests/fixtures are
@@ -86,9 +86,9 @@ not proof that runtime failures redact safely; runtime hardening is separate.
 The evidence reports marker counts and retains all unsuppressed findings. Other
 baseline reviews cover synthetic fixtures, type-narrowing assertions, shell-free
 tool invocations, a fixed-host documentation URL checker, and a status-enum false
-positive. No global rule exclusions replace review. `make security` retains its
-existing local src-only command; CI uses the expanded helper. Security tools receive
-a separate strict mypy invocation (`hatch run security-typecheck`), additive to the
+positive. No global rule exclusions replace review. Local full validation and CI
+use the same expanded inventory. Security tools receive
+a separate strict mypy invocation (`make security-typecheck`), additive to the
 existing project typecheck rather than changing its scope.
 
 ## Dependency and exception policy
@@ -101,8 +101,17 @@ leg audits the wheel's `otel` extra. That extra declares `opentelemetry-api`, no
 example application's separately installed Azure Monitor exporter. Development,
 docs and example-only dependencies are not part of the release base/OTel closure.
 Each supported interpreter is audited because environment markers affect resolution.
-Candidate environments use `venv --without-pip`; pip-audit runs outside with `--path`.
+Candidate environments use `venv --without-pip`; audit tools run outside them.
+`make security-runtime AUDIT_ARGS="--site-packages <purelib> --candidate-wheel <wheel>"`
+verifies wheel METADATA name/version against the installed distribution before
+excluding only that first-party candidate. Every installed third-party distribution
+is frozen as `name==version` and audited with `--requirement`, `--no-deps`, and
+`--disable-pip`; returned inventory must match the full installed closure.
+This applies independently to base and `otel` environments. Missing/mismatched
+candidate identity, skipped third parties or omitted dependencies block release.
 No audit-tool dependencies contaminate the candidate installation.
+Scheduled reporting uses `make security-runtime-report` with the same arguments
+and preserves non-PASS evidence in reporting-only workflow steps.
 
 Both policy files require maintainer review, exact identifiers, `reason`, `owner`,
 `added` and `expires` (ISO dates), and a positive lifetime at most 90 days. Static
@@ -122,9 +131,13 @@ Helpers exit PASS=0, FAIL=1 (unexcepted findings/expired exceptions), TOOL_ERROR
 tool/database failure), INCOMPLETE=3 (empty static scan, missing coverage, skipped
 packages, unlisted inline suppressions or absent execution evidence). Every non-PASS
 blocks release. Scheduled reporting preserves the same status but does not gate a
-release. Semgrep exposes only action outcome: success PASS, failure conservatively
+release. `make security-semgrep SCAN_OUTCOME=success` records INCOMPLETE with
+"action outcome only", not PASS, because no structured results or analysed
+inventory are available. The target tolerates exactly evidence exit 3 while the
+SHA-pinned Semgrep action remains the gate. Failure is conservatively
 TOOL_ERROR with unknown findings count, skipped/cancelled INCOMPLETE. Its original
 failing step remains blocking; an action failure alone is not called a vulnerability.
+`make security-host` is the opt-in local host test; it requires the e2e host prerequisites.
 
 Advisory database outages can delay publication: this is an intentional availability
 tradeoff for fail-closed verification. Bounded timeouts limit hangs. Never bypass

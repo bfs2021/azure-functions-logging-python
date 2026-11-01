@@ -7,11 +7,17 @@ interpreter, matching the other packages in the toolkit:
 - Python 3.11/3.12: `azure-functions>=1.21.0,<2.0.0`
 - Python 3.13/3.14: `azure-functions>=1.21.0,<3.0.0`
 
-`azure-functions` 2.x declares `Requires-Python >=3.13`, so the `<2.0.0` cap on
-older interpreters does not change what pip resolves there. On 3.13/3.14 the
-2.x line is permitted by the metadata, but this repository does not yet have a
-wheel or host lane that runs against 2.x, so the allowance is not a claim that
-2.x is certified here. Neither marker permits an `azure-functions` 3.x release.
+This split follows [#646](https://github.com/yeongseon/azure-functions-logging-python/issues/646):
+the original unbounded `azure-functions>=1.21.0` let a future major resolve
+silently, and the fix is package metadata and policy-test alignment, not
+evidence that today's SDK is broken. Published stable 2.x releases require
+Python >=3.13 and pip already respects that, so the `<2.0.0` cap on older
+interpreters restates an existing boundary explicitly rather than fixing
+today's resolution; the cap that does real work is `<3.0.0`, which prevents
+future untested majors. On 3.13/3.14 the 2.x line is permitted by the
+metadata, but this repository does not yet have a wheel or host lane that runs
+against 2.x, so the allowance is not a claim that 2.x is certified here.
+Neither marker permits an `azure-functions` 3.x release.
 
 The 1.x bound is exercised in required CI: both the exact floor (`1.21.0`) and
 the newest stable 1.x release allowed by the requirement are installed against
@@ -27,6 +33,12 @@ resolver is used; prereleases are not certified implicitly.
 | Both 1.x SDK selections, Python 3.11/3.12, Core Tools v4 | Candidate-wheel host registration, invocation fields and redaction |
 | Python 3.13/3.14 | Offline library matrix; 2.x is permitted by the markers but no wheel-based 2.x lane has run, so this is not a claim of host certification |
 | Future SDK 3.x | Never resolved: both markers cap below 3.0.0 |
+
+Recorded fresh-install resolutions (candidate wheel built from this branch):
+Python 3.11 resolves `azure-functions` 1.25.0 (latest 1.x) with a clean
+`pip check`; Python 3.14 — the same `python_version >= '3.13'` marker branch as
+3.13 — resolves `azure-functions` 2.3.0 with a clean `pip check`. These are
+resolver outcomes, not host certification: no 2.x host lane has run.
 
 A dependency bound is permission for the resolver, not a claim that the newest
 allowed release has been tested. If the 2.x allowance is kept, add a wheel-based

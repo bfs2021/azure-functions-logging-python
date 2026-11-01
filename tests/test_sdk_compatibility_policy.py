@@ -33,12 +33,21 @@ def test_dependency_markers_split_1x_and_2x_by_interpreter() -> None:
     assert all(req.marker is not None for req in reqs)
 
     def active(python_version: str) -> Requirement:
-        matches = [r for r in reqs if r.marker.evaluate({"python_version": python_version})]
+        matches = []
+        for req in reqs:
+            marker = req.marker
+            assert marker is not None
+            if marker.evaluate({"python_version": python_version}):
+                matches.append(req)
         assert len(matches) == 1, matches
         return matches[0]
 
     assert str(active("3.11").specifier) == "<2.0.0,>=1.21.0"
+    assert str(active("3.12").specifier) == "<2.0.0,>=1.21.0"
     assert str(active("3.13").specifier) == "<3.0.0,>=1.21.0"
+    assert str(active("3.14").specifier) == "<3.0.0,>=1.21.0"
     assert not active("3.11").specifier.contains("2.0.0")
+    assert not active("3.12").specifier.contains("2.0.0")
     assert active("3.13").specifier.contains("2.0.0")
+    assert active("3.14").specifier.contains("2.0.0")
     assert all(not req.specifier.contains("3.0.0") for req in reqs)
